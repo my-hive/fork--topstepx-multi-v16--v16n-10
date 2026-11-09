@@ -1,27 +1,20 @@
-"""Causal baseline, optional symbols. No requirement to manufacture market diversity.
-Slow 20-bar momentum, entries after 10:00 CT, flat at 14:00. Not claimed profitable.
-"""
+"""Causal session-opening gap reversion across FX and rates."""
 import numpy as np
-
-
-def entry_risk(panel):
-    return {symbol: np.zeros(len(df)) for symbol, df in panel.items()}
-
-
+import pandas as pd
+FAMILY = "prior-close-gap-reversion-multiasset"
+PARAMS = {"lookback": 30, "gap": 0.0005, "start": 34200, "end": 37800, "risk": 240}
 def signals(panel):
-    result = {}
-    for symbol, df in panel.items():
-        out = np.zeros(len(df), dtype=np.int64)
-        # Two micros only, at most 0.2 standard equivalents total.
-        if symbol not in ('MES', 'MGC'):
-            result[symbol] = out
-            continue
-        for indices in df.groupby('session', sort=False).indices.values():
-            close = df.close.to_numpy()[indices]
-            sec = df.ct_sec.to_numpy()[indices]
-            # Rolling mean excludes future rows; warmup restarts each session.
-            for j in range(20, len(indices)):
-                if 36000 <= sec[j] < 50400:
-                    out[indices[j]] = int(np.sign(close[j] - close[j-20:j].mean()))
-        result[symbol] = out
-    return result
+    out={s:np.zeros(len(d),dtype=np.int64) for s,d in panel.items()}
+    for s,d in panel.items():
+        sec=d.ct_sec.to_numpy(int); sess=d.session.astype(str).to_numpy(); c=d.close.to_numpy(float)
+        r=pd.Series(c).pct_change(PARAMS["lookback"]).to_numpy(); x=np.zeros(len(d),dtype=np.int64); prev=""; active=0
+        for i in range(len(d)):
+            if sess[i]!=prev: active=0; prev=sess[i]
+            if sec[i]>=PARAMS["end"]: active=0
+            elif active==0 and PARAMS["start"]<=sec[i]<PARAMS["end"] and np.isfinite(r[i]):
+                if r[i]>PARAMS["gap"]: active=-1
+                elif r[i]<-PARAMS["gap"]: active=1
+            x[i]=active
+        out[s]=x
+    return out
+def entry_risk(panel): return {s:np.full(len(d),float(PARAMS["risk"])) for s,d in panel.items()}

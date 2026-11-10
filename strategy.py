@@ -16,15 +16,13 @@ def signals(panel):
         days.setdefault(day, []).append(i)
     ordered = sorted(days)
     for pos, day in enumerate(ordered):
-        date = np.datetime64(day)
-        month = str(date)[:7]
-        future_month = str(ordered[min(pos + PARAMS["days"], len(ordered)-1)])[:7]
-        # last three available sessions of calendar month, causal from timestamp
-        if future_month == month:
+        month = day[:7]
+        future = ordered[min(pos + PARAMS["days"], len(ordered) - 1)][:7]
+        if future == month:
             continue
         for i in days[day]:
             if PARAMS["entry_start"] <= sec[i] < PARAMS["entry_end"]:
-                out["MNQ"][i] = 1
+                out["MNQ"][i] = -1
     return out
 
 

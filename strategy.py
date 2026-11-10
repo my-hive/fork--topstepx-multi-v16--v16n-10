@@ -1,7 +1,7 @@
 import numpy as np
 
-FAMILY = "equity-weekday-seasonality"
-PARAMS = {"weekday": 4, "entry_start": 36000, "entry_end": 54000, "risk": 250}
+FAMILY = "equity-month-end-seasonality"
+PARAMS = {"entry_start": 34200, "entry_end": 54000, "risk": 250, "days": 3}
 
 
 def signals(panel):
@@ -9,10 +9,22 @@ def signals(panel):
     if "MNQ" not in panel:
         return out
     df = panel["MNQ"]
+    sess = df["session"].astype(str).to_numpy()
     sec = df["ct_sec"].to_numpy(int)
-    day = df["session"].dt.dayofweek.to_numpy()
-    active = (day == PARAMS["weekday"]) & (sec >= PARAMS["entry_start"]) & (sec < PARAMS["entry_end"])
-    out["MNQ"][active] = -1
+    days = {}
+    for i, day in enumerate(sess):
+        days.setdefault(day, []).append(i)
+    ordered = sorted(days)
+    for pos, day in enumerate(ordered):
+        date = np.datetime64(day)
+        month = str(date)[:7]
+        future_month = str(ordered[min(pos + PARAMS["days"], len(ordered)-1)])[:7]
+        # last three available sessions of calendar month, causal from timestamp
+        if future_month == month:
+            continue
+        for i in days[day]:
+            if PARAMS["entry_start"] <= sec[i] < PARAMS["entry_end"]:
+                out["MNQ"][i] = 1
     return out
 
 
